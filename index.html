@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>MORIENTES - Posicionamento de Marca</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "obsidian-deep": "#050505",
+                        "obsidian": "#0A0A0A",
+                        "titanium": "#888888",
+                        "titanium-brushed": "#D1D1D1",
+                        "primary": "#ffffff",
+                        "secondary": "#c7c6c6",
+                        "surface": "#131313",
+                        "surface-dim": "#131313",
+                        "surface-bright": "#3a3939",
+                        "surface-container-lowest": "#0e0e0e",
+                        "surface-container-low": "#1c1b1b",
+                        "surface-container": "#201f1f",
+                        "surface-container-high": "#2a2a2a",
+                        "on-surface": "#e5e2e1",
+                        "on-surface-variant": "#c4c7c8",
+                        "outline": "#8e9192",
+                        "outline-variant": "#444748",
+                        "border-subtle": "rgba(255, 255, 255, 0.08)",
+                        "background": "#0A0A0A",
+                        "accent": "#196EFA"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "unit": "4px",
+                        "margin-desktop": "64px",
+                        "margin-mobile": "20px",
+                        "section-gap": "120px"
+                    },
+                    "fontFamily": {
+                        "display-2xl": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "technical-sm": ["JetBrains Mono"],
+                        "label-caps": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "display-2xl": ["72px", { "lineHeight": "80px", "letterSpacing": "-0.04em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "headline-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "technical-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "label-caps": ["10px", { "lineHeight": "12px", "letterSpacing": "0.1em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* =====================================================================
+           SCRUB — o scroll como playhead de mesa de edição.
+           O motor JS escreve apenas os números abaixo; todo o visual é CSS.
+           ===================================================================== */
+        @property --sp {
+            /* progresso do scroll .......... 0 → 1 */
+            syntax: '<number>';
+            inherits: true;
+            initial-value: 0;
+        }
+
+        @property --sv {
+            /* magnitude da velocidade ..... 0 → 1 */
+            syntax: '<number>';
+            inherits: true;
+            initial-value: 0;
+        }
+
+        @property --svs {
+            /* velocidade com sinal ....... -1 → 1 */
+            syntax: '<number>';
+            inherits: true;
+            initial-value: 0;
+        }
+
+        @property --hp {
+            /* progresso do hero ........... 0 → 1 */
+            syntax: '<number>';
+            inherits: true;
+            initial-value: 0;
+        }
+
+        @property --mx {
+            /* deslocamento do marquee em px */
+            syntax: '<number>';
+            inherits: true;
+            initial-value: 0;
+        }
+
+        :root {
+            --accent: #196EFA;
+        }
+
+        html {
+            /* `clip`, NÃO `hidden`: hidden transformaria o viewport em scroll
+               container e quebraria position:sticky + animation-timeline. */
+            overflow-x: clip;
+            /* --header-h é medido pelo motor: a altura do header fixo depende de
+               qual utilitário de font-size ganha no wordmark. */
+            scroll-padding-top: calc(var(--header-h, 96px) + 24px);
+            scroll-behavior: smooth;
+            /* Scrollbar nativa oculta: o playhead da régua é o único indicador
+               de posição. O scroll continua nativo (roda, trackpad, teclado). */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* Edge legado */
+        }
+
+        html::-webkit-scrollbar,
+        body::-webkit-scrollbar {
+            /* Chrome / Safari / Edge */
+            width: 0;
+            height: 0;
+            display: none;
+        }
+
+        #scrub-rail {
+            top: var(--header-h, 96px);
+        }
+
+        body {
+            background-color: #0A0A0A;
+            color: #e5e2e1;
+        }
+
+        .light-leak {
+            background: radial-gradient(circle at 50% 50%, rgba(25, 110, 250, 0.08) 0%, transparent 60%);
+        }
+
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .titanium-gradient {
+            background: linear-gradient(135deg, #ffffff 0%, #D1D1D1 50%, #888888 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .three-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ---------- camada global: scanlines + perfuração de filme ---------- */
+        .scrub-grain {
+            background-image:
+                repeating-linear-gradient(to bottom, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px),
+                repeating-linear-gradient(to bottom, transparent 0 8px, rgba(255, 255, 255, .05) 8px 15px, transparent 15px 22px);
+            background-size: 100% auto, 5px auto;
+            background-repeat: repeat, repeat-y;
+            background-position: 0 0, 14px 0;
+            opacity: .5;
+        }
+
+        /* ---------- barra de progresso / scrub no topo do frame ---------- */
+        .scrub-progress {
+            position: fixed;
+            inset: 0 0 auto 0;
+            height: 2px;
+            z-index: 60;
+            transform: scaleX(var(--sp));
+            transform-origin: 0 50%;
+            background: linear-gradient(90deg, rgba(25, 110, 250, .3), var(--accent));
+            box-shadow: 0 0 12px rgba(25, 110, 250, .55);
+            pointer-events: none;
+        }
+
+        /* ---------- régua de timecode ---------- */
+        .scrub-rec {
+            width: 6px;
+            height: 6px;
+            border-radius: 9999px;
+            background: var(--accent);
+            box-shadow: 0 0 8px rgba(25, 110, 250, .9);
+            opacity: calc(.2 + var(--sv) * .8);
+        }
+
+        .scrub-tc-frames {
+            color: var(--accent);
+        }
+
+        .scrub-ticks {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 18px;
+            width: 8px;
+            background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, .13) 0 1px, transparent 1px 9px);
+        }
+
+        .scrub-ticks::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 1px;
+            background: rgba(255, 255, 255, .09);
+        }
+
+        .scrub-playhead {
+            position: absolute;
+            left: 13px;
+            width: 18px;
+            height: 1px;
+            top: calc(var(--sp) * 100%);
+            background: var(--accent);
+            box-shadow: 0 0 10px rgba(25, 110, 250, .85);
+        }
+
+        .scrub-playhead::after {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: -2px;
+            width: 5px;
+            height: 5px;
+            background: var(--accent);
+            transform: rotate(45deg);
+        }
+
+        .scrub-marker {
+            position: absolute;
+            left: 34px;
+            transform: translateY(-50%);
+            color: #444748;
+            pointer-events: auto;
+            transition: color .2s linear;
+        }
+
+        .scrub-marker:hover {
+            color: #D1D1D1;
+        }
+
+        .scrub-marker.is-active {
+            color: #ffffff;
+        }
+
+        .scrub-marker.is-active::before {
+            content: '';
+            position: absolute;
+            left: -7px;
+            top: 50%;
+            width: 2px;
+            height: 10px;
+            margin-top: -5px;
+            background: var(--accent);
+        }
+
+        .scrub-seq {
+            position: absolute;
+            right: calc(100% + 6px);
+            top: calc(var(--sp) * 100%);
+            transform: translateY(-50%);
+            white-space: nowrap;
+            padding: 3px 8px;
+            color: #c4c7c8;
+            background: rgba(10, 10, 10, .8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, .08);
+        }
+
+        /* ---------- hero: o "primeiro corte" ---------- */
+        @media (prefers-reduced-motion: no-preference) {
+            .scrub-hero-content {
+                transform: translate3d(0, calc(var(--hp) * -40px), 0) scale(calc(1 - var(--hp) * .04));
+                opacity: calc(1 - var(--hp) * 1.15);
+            }
+
+            .scrub-leak {
+                transform: scaleY(calc(1 - var(--hp) * .92));
+            }
+
+            .scrub-hint {
+                opacity: calc(.7 - var(--hp) * 2.2);
+                animation: scrollHint 2s infinite ease-in-out;
+            }
+
+            /* velocidade como sinal físico: fita sendo scrubbada */
+            .scrub-warp {
+                transform: skewY(calc(var(--svs) * -.35deg));
+                filter: blur(calc(var(--sv) * .7px));
+            }
+
+            .scrub-grain {
+                background-position: 0 calc(var(--sp) * -420px), 14px calc(var(--sp) * -1400px);
+                opacity: calc(.45 + var(--sv) * .55);
+            }
+        }
+
+        /* transform-only: a Tailwind aplica -translate-x-1/2 e a animação a
+           sobrescreveria, descentralizando o hint. */
+        @keyframes scrollHint {
+
+            0%,
+            100% {
+                transform: translate(-50%, 0);
+            }
+
+            50% {
+                transform: translate(-50%, 10px);
+            }
+        }
+
+        /* ---------- marquee scrubável (bidirecional, sem emenda) ---------- */
+        .marquee-container {
+            display: flex;
+            overflow: hidden;
+            user-select: none;
+            gap: 4rem;
+            mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+        }
+
+        .marquee-content {
+            display: flex;
+            flex-shrink: 0;
+            justify-content: space-around;
+            align-items: center;
+            min-width: 100%;
+            gap: 4rem;
+            transform: translate3d(calc(var(--mx) * -1px), 0, 0);
+        }
+
+        /* ---------- reveals: "cortam", não desbotam ---------- */
+        @media (prefers-reduced-motion: no-preference) {
+
+            /* Nada de clip-path no estado de repouso: clip-path zera a área de
+               interseção, o IntersectionObserver nunca dispara e o elemento
+               jamais se revela (deadlock). O wipe é uma animação, aplicada só
+               ao revelar — e `backwards` evita deixar clip-path residual. */
+            .scrub-reveal {
+                opacity: 0;
+                transform: translate3d(0, 12px, 0);
+            }
+
+            .scrub-reveal.is-in {
+                opacity: 1;
+                transform: none;
+                transition:
+                    opacity .22s linear var(--d, 0s),
+                    transform .22s linear var(--d, 0s);
+                animation: scrubClipIn .34s linear var(--d, 0s) backwards;
+            }
+
+            /* o "corte": hairline de 1px que atravessa a seção */
+            .scrub-cut::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 1px;
+                transform: scaleX(0);
+                transform-origin: 0 50%;
+                transition: transform .34s linear;
+                background: linear-gradient(90deg, transparent, rgba(25, 110, 250, .55) 25%, rgba(25, 110, 250, .55) 75%, transparent);
+                pointer-events: none;
+                z-index: 20;
+            }
+
+            .scrub-cut.is-in::before {
+                transform: scaleX(1);
+            }
+
+            /* metadados mono datilografam */
+            .scrub-type {
+                clip-path: inset(0 100% 0 0);
+                transition: clip-path .26s linear var(--d, .14s);
+            }
+
+            .is-in .scrub-type,
+            .scrub-type.is-in {
+                clip-path: inset(0 0 0 0);
+            }
+        }
+
+        /* ---------- cards de portfólio = clipes na timeline ---------- */
+        .scrub-meta {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 3;
+            display: flex;
+            padding: 4px 8px;
+            color: #c4c7c8;
+            background: rgba(5, 5, 5, .55);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, .08);
+            opacity: .7;
+            transition: opacity .2s linear;
+        }
+
+        .group:hover .scrub-meta {
+            opacity: 1;
+        }
+
+        .scrub-meta span+span {
+            position: relative;
+            padding-left: 14px;
+        }
+
+        .scrub-meta span+span::before {
+            content: '·';
+            position: absolute;
+            left: 5px;
+            color: #444748;
+        }
+
+        /* playhead que varre o frame uma única vez, ao cruzar o centro */
+        .scrub-clip::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, transparent 0, rgba(25, 110, 250, 0) 46%, var(--accent) 50%, rgba(25, 110, 250, 0) 54%, transparent 100%);
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .scrub-clip.is-swept::after {
+                animation: scrubSweep .6s linear forwards;
+            }
+        }
+
+        @keyframes scrubClipIn {
+            from {
+                clip-path: inset(0 0 100% 0);
+            }
+
+            to {
+                clip-path: inset(0 0 0 0);
+            }
+        }
+
+        @keyframes scrubSweep {
+            0% {
+                opacity: 1;
+                transform: translateX(-100%);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+
+        /* parallax nativo dirigido por scroll, onde houver suporte */
+        @keyframes scrubParallax {
+            from {
+                transform: translate3d(0, -6%, 0) scale(1.14);
+            }
+
+            to {
+                transform: translate3d(0, 6%, 0) scale(1.14);
+            }
+        }
+
+        @supports (animation-timeline: view()) {
+            @media (prefers-reduced-motion: no-preference) {
+                .scrub-parallax {
+                    animation: scrubParallax linear both;
+                    animation-timeline: view();
+                    animation-range: cover 0% cover 100%;
+                }
+            }
+        }
+
+        /* ---------- reduced motion ---------- */
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+        }
+
+        .nav-link.is-active {
+            color: #ffffff;
+            border-bottom-color: #ffffff;
+        }
+
+        /* promoção de layer só enquanto há movimento */
+        .scrub-scrolling .scrub-warp,
+        .scrub-scrolling .marquee-content {
+            will-change: transform;
+        }
+    </style>
+</head>
+
+<body class="antialiased selection:bg-titanium selection:text-obsidian min-h-screen relative lg:pr-16">
+    <!-- Global grain layer: scanlines + film perforation, scroll-reactive -->
+    <div class="scrub-grain fixed inset-0 z-[-1] pointer-events-none" aria-hidden="true"></div>
+    <!-- Scrub bar: progresso do playhead no topo do frame -->
+    <div class="scrub-progress" aria-hidden="true"></div>
+    <!-- Scrub Rail: HUD de timecode (desktop) -->
+    <aside aria-hidden="true" id="scrub-rail"
+        class="hidden lg:flex fixed right-0 bottom-0 w-16 z-40 flex-col items-center pt-6 pb-8 border-l border-border-subtle pointer-events-none select-none">
+        <div class="flex flex-col items-center gap-1.5">
+            <span class="scrub-rec"></span>
+            <span class="font-label-caps text-label-caps text-outline tracking-[0.1em]">REC</span>
+        </div>
+        <div
+            class="mt-5 flex flex-col items-center gap-0.5 font-technical-sm text-technical-sm tabular-nums text-primary">
+            <span data-tc="0">00</span>
+            <span data-tc="1">00</span>
+            <span data-tc="2">00</span>
+            <span class="scrub-tc-frames" data-tc="3">00</span>
+        </div>
+        <div class="relative w-full flex-1 mt-6 mb-4" id="scrub-ladder">
+            <div class="scrub-ticks"></div>
+            <div class="scrub-playhead"></div>
+            <span class="scrub-seq font-technical-sm text-technical-sm" id="scrub-seq"></span>
+        </div>
+        <div class="flex flex-col items-center gap-0.5 font-label-caps text-label-caps text-outline-variant">
+            <span>DUR</span>
+            <span class="tabular-nums">01:20</span>
+        </div>
+    </aside>
+    <!-- TopAppBar -->
+    <header class="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-border-subtle">
+        <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 w-full">
+            <button aria-label="Menu" class="text-primary hover:text-titanium transition-colors duration-200">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>
+            </button>
+            <a class="font-display-2xl text-headline-lg md:text-display-2xl tracking-tighter text-primary text-[24px] md:text-[32px]"
+                href="#">MORIENTES</a>
+            <div class="flex items-center gap-6">
+                <nav class="hidden md:flex items-center gap-8">
+                    <a class="nav-link font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-200 uppercase tracking-[0.1em] border-b-2 border-transparent pb-1"
+                        href="#inicio">INÍCIO</a>
+                    <a class="nav-link font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-200 uppercase tracking-[0.1em] border-b-2 border-transparent pb-1"
+                        href="#visao">VISÃO</a>
+                    <a class="nav-link font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-200 uppercase tracking-[0.1em] border-b-2 border-transparent pb-1"
+                        href="#servicos">SERVIÇOS</a>
+                    <a class="nav-link font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-200 uppercase tracking-[0.1em] border-b-2 border-transparent pb-1"
+                        href="#casos-de-sucesso">CASOS DE SUCESSO</a>
+                    <a class="nav-link font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-200 uppercase tracking-[0.1em] border-b-2 border-transparent pb-1"
+                        href="#contato">CONTATO</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+    <main>
+        <!-- Hero Section -->
+        <section id="inicio"
+            class="relative h-screen flex flex-col justify-center items-center px-margin-mobile md:px-margin-desktop pt-24 pb-12 overflow-hidden">
+            <div class="absolute inset-0 light-leak scrub-leak z-[-1]"></div>
+            <!-- 3D Animation Container 9 -->
+            <div class="three-container opacity-60" id="hero-3d-container"></div>
+            <div
+                class="scrub-hero-content max-w-7xl w-full mx-auto flex flex-col items-center justify-center text-center relative z-10 pointer-events-auto mt-24">
+                <h1
+                    class="scrub-warp font-display-2xl text-display-2xl md:text-[96px] leading-none tracking-tighter titanium-gradient mb-6 max-w-5xl">
+                    POSICIONAMENTO DE MARCA PARA A ERA DIGITAL
+                </h1>
+                <div class="flex items-center gap-4 mt-8 opacity-80">
+                    <span class="w-12 h-[1px] bg-border-subtle"></span>
+                    <p class="font-technical-sm text-technical-sm text-on-surface-variant uppercase tracking-[0.05em]">
+                        INOVE-SE</p>
+                    <span class="w-12 h-[1px] bg-border-subtle"></span>
+                </div>
+            </div>
+            <!-- Scroll Hint -->
+            <div class="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 scrub-hint z-10">
+                <span class="font-technical-sm text-technical-sm text-on-surface-variant">EXPLORAR</span>
+                <span class="material-symbols-outlined text-on-surface-variant">arrow_downward</span>
+            </div>
+        </section>
+        <!-- Client Carousel (Marquee) -->
+        <section class="py-12 border-y border-border-subtle bg-surface-dim overflow-hidden" id="clientes">
+            <div class="marquee-container">
+                <div class="marquee-content items-center">
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">ARCHON</span>
+                    <span class="material-symbols-outlined text-outline-variant">change_history</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">NEON</span>
+                    <span class="material-symbols-outlined text-outline-variant">bolt</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">TITAN</span>
+                    <span class="material-symbols-outlined text-outline-variant">hexagon</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">VORTEX</span>
+                    <span class="material-symbols-outlined text-outline-variant">all_out</span>
+                </div>
+                <div aria-hidden="true" class="marquee-content items-center">
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">ARCHON</span>
+                    <span class="material-symbols-outlined text-outline-variant">change_history</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">NEON</span>
+                    <span class="material-symbols-outlined text-outline-variant">bolt</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">TITAN</span>
+                    <span class="material-symbols-outlined text-outline-variant">hexagon</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">VORTEX</span>
+                    <span class="material-symbols-outlined text-outline-variant">all_out</span>
+                </div>
+                <div aria-hidden="true" class="marquee-content items-center">
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">ARCHON</span>
+                    <span class="material-symbols-outlined text-outline-variant">change_history</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">NEON</span>
+                    <span class="material-symbols-outlined text-outline-variant">bolt</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">TITAN</span>
+                    <span class="material-symbols-outlined text-outline-variant">hexagon</span>
+                    <span
+                        class="font-display-2xl text-headline-lg tracking-widest text-outline-variant uppercase">VORTEX</span>
+                    <span class="material-symbols-outlined text-outline-variant">all_out</span>
+                </div>
+            </div>
+        </section>
+        <!-- Institutional Section -->
+        <section id="visao"
+            class="scrub-cut py-section-gap px-margin-mobile md:px-margin-desktop bg-obsidian-deep relative border-b border-border-subtle">
+            <div class="max-w-4xl mx-auto text-center relative z-10">
+                <div class="scrub-reveal inline-block border border-border-subtle px-4 py-1 rounded-full mb-8">
+                    <span class="scrub-type font-technical-sm text-technical-sm text-titanium">O QUE FAZEMOS</span>
+                </div>
+                <h2 class="scrub-reveal font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight mb-8"
+                    style="--d:.08s">
+                    UNIMOS ENGENHARIA DE PRECISÃO COM NARRATIVA VISUAL PARA ESTRUTURAR MARCAS QUE DOMINAM SEUS NICHOS.
+                </h2>
+            </div>
+        </section>
+        <!-- Services Section -->
+        <section class="scrub-cut py-section-gap px-margin-mobile md:px-margin-desktop relative" id="servicos">
+            <div class="max-w-7xl mx-auto">
+                <div class="mb-16">
+                    <h2
+                        class="scrub-reveal font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight">
+                        POSICIONAMENTO DIGITAL</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+                    <!-- Main Service -->
+                    <div
+                        class="scrub-reveal md:col-span-12 glass-panel p-8 md:p-12 rounded-lg border-l-4 border-l-primary group hover:bg-surface-container-low transition-colors duration-300">
+                        <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">01 //
+                            NÚCLEO</span>
+                        <h3
+                            class="font-display-2xl text-headline-lg md:text-display-2xl text-primary tracking-tighter mb-4 group-hover:titanium-gradient transition-all">
+                            ESTRATÉGIA DE POSICIONAMENTO</h3>
+                        <p class="font-body-md text-on-surface-variant max-w-2xl">Mapeamento de ecossistema, definição
+                            de arquétipos e criação de diretrizes fundamentais para estabelecer autoridade
+                            inquestionável no mercado digital.</p>
+                    </div>
+                    <!-- Secondary Services -->
+                    <div style="--d:.08s"
+                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg mt-8 border-t border-border-subtle hover:border-titanium transition-colors duration-300">
+                        <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">02</span>
+                        <h4 class="font-headline-lg-mobile text-primary tracking-tight mb-4">Identidade Visual de Alta
+                            Fidelidade</h4>
+                        <p class="font-body-md text-on-surface-variant text-sm">Design systems escaláveis, tipografia
+                            proprietária e direção de arte focada em luxo tecnológico.</p>
+                    </div>
+                    <div style="--d:.12s"
+                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg mt-8 border-t border-border-subtle hover:border-titanium transition-colors duration-300">
+                        <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">03</span>
+                        <h4 class="font-headline-lg-mobile text-primary tracking-tight mb-4">Narrativa Cinematográfica
+                        </h4>
+                        <p class="font-body-md text-on-surface-variant text-sm">Produção audiovisual de ponta, motion
+                            design e storytelling visual para campanhas de impacto.</p>
+                    </div>
+                    <div style="--d:.16s"
+                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg mt-8 border-t border-border-subtle hover:border-titanium transition-colors duration-300">
+                        <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">04</span>
+                        <h4 class="font-headline-lg-mobile text-primary tracking-tight mb-4">Gestão de Ativos Digitais
+                        </h4>
+                        <p class="font-body-md text-on-surface-variant text-sm">Organização, manutenção e evolução
+                            contínua da presença digital da marca em múltiplos pontos de contato.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Social Proof / Works -->
+        <section
+            class="scrub-cut py-section-gap px-margin-mobile md:px-margin-desktop bg-surface-dim relative border-y border-border-subtle"
+            id="casos-de-sucesso">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex justify-between items-end mb-16">
+                    <h2
+                        class="scrub-reveal font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight">
+                        CASOS DE SUCESSO</h2>
+                    <button
+                        class="px-6 py-3 rounded border border-border-subtle font-technical-sm text-technical-sm text-primary hover:border-primary transition-colors duration-200 flex items-center gap-2">
+                        VER_PORTFÓLIO <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Work 1 -->
+                    <div class="scrub-reveal group cursor-pointer" style="--d:.06s">
+                        <div class="scrub-clip relative w-full aspect-video glass-panel rounded overflow-clip mb-4">
+                            <div class="scrub-parallax absolute inset-0 bg-cover bg-center w-full h-full opacity-80 transition-opacity duration-200 group-hover:opacity-100"
+                                style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAa5axU7LwNNRKAMMjlJi0B-fGA1aPeHVm4JtXUqAHpxFRjwko3dfkD135eCRs_PXy9xNp5PHz3bWbzjBEC5ulkEoSHb2ZDRq2It_kO4_5QgwwM57Nrzb-eLwI-gmDN90c9_VijDuMe6Hp1MF4qnhbNH5ALHvq4_fLaJdwQCtB7Nfe_ulS-qb-kFmsnU6o3MxWEssCH0CMXFSqzB29SKkkjXowoRGNlMUzZnrk94XPcT9KOoc-3hOcH')">
+                            </div>
+                            <div class="scrub-meta scrub-type font-technical-sm text-technical-sm" style="--d:.3s">
+                                <span>1920×1080</span><span>24 FPS</span><span>PRJ_0231</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-body-md text-body-md text-primary font-bold mb-1">NEON VOID //
+                                    REPOSICIONAMENTO</h3>
+                                <p class="scrub-type font-technical-sm text-technical-sm text-on-surface-variant"
+                                    style="--d:.22s">TECNOLOGIA / 2023
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Work 2 -->
+                    <div class="scrub-reveal group cursor-pointer" style="--d:.12s">
+                        <div class="scrub-clip relative w-full aspect-video glass-panel rounded overflow-clip mb-4">
+                            <div class="scrub-parallax absolute inset-0 bg-cover bg-center w-full h-full opacity-80 transition-opacity duration-200 group-hover:opacity-100"
+                                style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC--XDMtloL9XyV9tv7x11-ozUQ66ocWHnoSu85_N6kmqU_wY0-mcwyAd-d_PyaVTpVFq8BMvVvbNgNxXmr3ADWnafgLwAjAHfgFIA96f0uNyzn8yccKN8AUpKMGzcsVquyoyDvJXasPn63QyN7DoO3SSNd5rWelXWTZ_zAMqmjWc6nXYn1RyfNq4QFDsGU729y092nCb2lTipXkKd1ii9TlNwNsMiRjL2Rb-EMGtgFYupv-f5jVKzo')">
+                            </div>
+                            <div class="scrub-meta scrub-type font-technical-sm text-technical-sm" style="--d:.36s">
+                                <span>2048×1152</span><span>24 FPS</span><span>PRJ_0417</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-body-md text-body-md text-primary font-bold mb-1">CHROME SILHOUETTE //
+                                    IDENTIDADE VISUAL</h3>
+                                <p class="scrub-type font-technical-sm text-technical-sm text-on-surface-variant"
+                                    style="--d:.28s">EDITORIAL / 2024
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Contact Section -->
+        <section class="scrub-cut py-section-gap px-margin-mobile md:px-margin-desktop relative" id="contato">
+            <div
+                class="scrub-reveal max-w-3xl mx-auto glass-panel p-8 md:p-16 rounded-xl border border-border-subtle relative z-10">
+                <div class="text-center mb-12">
+                    <h2
+                        class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight mb-4">
+                        ELEVE SUA MARCA</h2>
+                    <p class="scrub-type font-technical-sm text-technical-sm text-on-surface-variant" style="--d:.24s">
+                        PREENCHA OS DADOS PARA UMA
+                        AVALIAÇÃO PRELIMINAR</p>
+                </div>
+                <form class="flex flex-col gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="font-technical-sm text-technical-sm text-outline mb-2 block" for="name">NOME
+                                COMPLETO</label>
+                            <input
+                                class="w-full bg-surface-container-lowest border border-border-subtle rounded text-primary p-4 focus:outline-none focus:border-titanium transition-colors"
+                                id="name" placeholder="John Doe" type="text" />
+                        </div>
+                        <div>
+                            <label class="font-technical-sm text-technical-sm text-outline mb-2 block"
+                                for="company">EMPRESA</label>
+                            <input
+                                class="w-full bg-surface-container-lowest border border-border-subtle rounded text-primary p-4 focus:outline-none focus:border-titanium transition-colors"
+                                id="company" placeholder="Sua Marca" type="text" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-technical-sm text-technical-sm text-outline mb-2 block" for="email">E-MAIL
+                            CORPORATIVO</label>
+                        <input
+                            class="w-full bg-surface-container-lowest border border-border-subtle rounded text-primary p-4 focus:outline-none focus:border-titanium transition-colors"
+                            id="email" placeholder="john@empresa.com" type="email" />
+                    </div>
+                    <button
+                        class="mt-4 w-full bg-primary text-obsidian-deep font-technical-sm text-technical-sm font-bold py-4 rounded hover:bg-titanium-brushed transition-colors tracking-widest uppercase">
+                        INICIAR PROCESSO DE POSICIONAMENTO
+                    </button>
+                </form>
+            </div>
+        </section>
+    </main>
+    <!-- Footer -->
+    <footer
+        class="scrub-cut w-full py-section-gap border-t border-border-subtle bg-obsidian-deep px-margin-mobile md:px-margin-desktop relative overflow-hidden">
+        <!-- 3D Animation Container 10 -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-20 pointer-events-none z-0"
+            id="footer-3d-container"></div>
+        <div
+            class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-8 md:gap-0 relative z-10">
+            <div class="flex flex-col gap-2">
+                <span
+                    class="font-display-2xl text-headline-lg tracking-tighter text-primary opacity-50">MORIENTES</span>
+                <p class="scrub-type font-technical-sm text-technical-sm text-on-surface-variant">©2024 MORIENTES
+                    STUDIOS. TODOS
+                    OS DIREITOS RESERVADOS.</p>
+            </div>
+            <nav class="flex flex-col md:flex-row gap-6 md:gap-8">
+                <a class="font-technical-sm text-technical-sm text-on-surface-variant hover:text-primary transition-colors duration-200"
+                    href="#">INSTAGRAM</a>
+                <a class="font-technical-sm text-technical-sm text-on-surface-variant hover:text-primary transition-colors duration-200"
+                    href="#">VIMEO</a>
+                <a class="font-technical-sm text-technical-sm text-on-surface-variant hover:text-primary transition-colors duration-200"
+                    href="#">LINKEDIN</a>
+            </nav>
+        </div>
+    </footer>
+    <!-- SCRUB Engine -->
+    <script id="scrub-engine">
+            /* =====================================================================
+               SCRUB — motor de scroll único.
+               Escreve ~5 números por frame em :root; todo o visual é resolvido em CSS.
+               Sem dependências e sem hijack: o scroll continua nativo.
+               ===================================================================== */
+            (function () {
+                'use strict';
+
+                const root = document.documentElement;
+                const rmq = window.matchMedia('(prefers-reduced-motion: reduce)');
+                let reduce = rmq.matches;
+
+                const FPS = 24;
+                const TOTAL_FRAMES = FPS * 80;   /* duração fictícia: 00:01:20:00 */
+                const VEL_SCALE = 55;            /* px/frame que saturam a velocidade */
+                const VEL_SMOOTH = 0.18;
+                const MARQUEE_SCRUB = 0.35;      /* quanto o scroll empurra o ticker */
+                const MARQUEE_LOOP = 20;         /* segundos por volta em repouso */
+
+                const state = { vel: 0, progress: 0 };
+                window.__scrub = state;
+
+                /* ---------- sequências da timeline ---------- */
+                const SEQ = [
+                    { id: 'inicio', label: 'ABERTURA' },
+                    { id: 'clientes', label: 'CLIENTES' },
+                    { id: 'visao', label: 'VISÃO' },
+                    { id: 'servicos', label: 'SERVIÇOS' },
+                    { id: 'casos-de-sucesso', label: 'CASOS' },
+                    { id: 'contato', label: 'CONTATO' }
+                ].filter(function (s) { s.el = document.getElementById(s.id); return s.el; });
+
+                const ladder = document.getElementById('scrub-ladder');
+                const seqLabel = document.getElementById('scrub-seq');
+                const tcEls = [0, 1, 2, 3].map(function (i) {
+                    return document.querySelector('[data-tc="' + i + '"]');
+                });
+                const navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-link'));
+
+                /* marcadores de sequência no rail (posicionados por medição real) */
+                if (ladder) {
+                    SEQ.forEach(function (s, i) {
+                        const a = document.createElement('a');
+                        a.className = 'scrub-marker font-label-caps text-label-caps';
+                        a.href = '#' + s.id;
+                        a.tabIndex = -1;
+                        a.textContent = String(i + 1).padStart(2, '0');
+                        ladder.appendChild(a);
+                        s.marker = a;
+                    });
+                }
+
+                /* ---------- cache de geometria: zero leitura de layout por frame --- */
+                let scrollRange = 1;
+                let viewportH = window.innerHeight;
+                let marqueePeriod = 0;
+                let headerH = 96;
+                const mTrack = document.querySelector('.marquee-content');
+                const header = document.querySelector('header');
+
+                function measure() {
+                    viewportH = window.innerHeight;
+                    scrollRange = Math.max(1, root.scrollHeight - viewportH);
+
+                    /* a altura do header fixo depende de qual utilitário de font-size
+                       vence no wordmark — medir é mais seguro que assumir. */
+                    if (header) {
+                        headerH = Math.round(header.getBoundingClientRect().height) || 96;
+                        root.style.setProperty('--header-h', headerH + 'px');
+                    }
+
+                    if (mTrack && mTrack.parentNode) {
+                        const gap = parseFloat(getComputedStyle(mTrack.parentNode).columnGap) || 64;
+                        marqueePeriod = mTrack.offsetWidth + gap;
+                    }
+
+                    const y = window.scrollY;
+                    const offset = headerH + 24;   /* = scroll-padding-top */
+                    SEQ.forEach(function (s) {
+                        if (!s.marker) return;
+                        const top = s.el.getBoundingClientRect().top + y - offset;
+                        const p = Math.min(1, Math.max(0, top / scrollRange));
+                        s.marker.style.top = (p * 100).toFixed(3) + '%';
+                    });
+                }
+
+                /* ---------- timecode SMPTE ---------- */
+                let lastFrame = -1;
+                function updateTimecode(p) {
+                    const fr = Math.round(p * TOTAL_FRAMES);
+                    if (fr === lastFrame) return;
+                    lastFrame = fr;
+                    const sec = Math.floor(fr / FPS);
+                    const parts = [
+                        Math.floor(sec / 3600),
+                        Math.floor(sec / 60) % 60,
+                        sec % 60,
+                        fr % FPS
+                    ];
+                    for (let i = 0; i < 4; i++) {
+                        if (tcEls[i]) tcEls[i].textContent = String(parts[i]).padStart(2, '0');
+                    }
+                }
+
+                /* ---------- loop único, com auto-idle ---------- */
+                let lastY = window.scrollY;
+                let lastT = 0;
+                let vel = 0;
+                let mx = 0;
+                let running = false;
+                let dirty = true;
+                let marqueeLive = false;
+                let wasScrolling = false;
+
+                function frame(t) {
+                    const dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+                    lastT = t;
+
+                    const y = window.scrollY;
+                    const dy = y - lastY;
+                    lastY = y;
+
+                    const p = Math.min(1, Math.max(0, y / scrollRange));
+                    state.progress = p;
+                    root.style.setProperty('--sp', p.toFixed(5));
+                    root.style.setProperty('--hp', Math.min(1, y / Math.max(1, viewportH)).toFixed(4));
+                    updateTimecode(p);
+
+                    if (reduce) {
+                        vel = 0;
+                        state.vel = 0;
+                        return;
+                    }
+
+                    /* suavizar o SINAL de velocidade não é hijack: o scroll é nativo */
+                    const target = Math.max(-1, Math.min(1, dy / VEL_SCALE));
+                    vel += (target - vel) * VEL_SMOOTH;
+                    if (Math.abs(vel) < 0.0005) vel = 0;
+                    state.vel = vel;
+                    root.style.setProperty('--svs', vel.toFixed(4));
+                    root.style.setProperty('--sv', Math.abs(vel).toFixed(4));
+
+                    const scrolling = Math.abs(vel) > 0.02;
+                    if (scrolling !== wasScrolling) {
+                        root.classList.toggle('scrub-scrolling', scrolling);
+                        wasScrolling = scrolling;
+                    }
+
+                    /* marquee scrubável: drift constante + empurrão assinado do scroll */
+                    if (marqueeLive && marqueePeriod > 0) {
+                        mx += (marqueePeriod / MARQUEE_LOOP) * dt + dy * MARQUEE_SCRUB;
+                        mx %= marqueePeriod;
+                        if (mx < 0) mx += marqueePeriod;
+                        root.style.setProperty('--mx', mx.toFixed(2));
+                    }
+                }
+
+                function tick(t) {
+                    frame(t);
+                    const busy = dirty || Math.abs(vel) > 0.001 || (marqueeLive && !reduce);
+                    dirty = false;
+                    if (busy) {
+                        requestAnimationFrame(tick);
+                    } else {
+                        running = false;
+                        lastT = 0;
+                    }
+                }
+
+                function kick() {
+                    dirty = true;
+                    if (!running) {
+                        running = true;
+                        requestAnimationFrame(tick);
+                    }
+                }
+
+                window.addEventListener('scroll', kick, { passive: true });
+
+                /* ---------- observers ---------- */
+                /* 1. reveals — one-shot */
+                const revealIO = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (e) {
+                        if (!e.isIntersecting) return;
+                        e.target.classList.add('is-in');
+                        revealIO.unobserve(e.target);
+                    });
+                }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+                document.querySelectorAll('.scrub-reveal, .scrub-cut').forEach(function (el) {
+                    revealIO.observe(el);
+                });
+
+                /* 2. varredura do playhead nos clipes — one-shot, ao cruzar o centro */
+                const sweepIO = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (e) {
+                        if (!e.isIntersecting) return;
+                        e.target.classList.add('is-swept');
+                        sweepIO.unobserve(e.target);
+                    });
+                }, { rootMargin: '-42% 0px -42% 0px' });
+                document.querySelectorAll('.scrub-clip').forEach(function (el) {
+                    sweepIO.observe(el);
+                });
+
+                /* 3. scroll-spy: nav + marcador + rótulo de sequência */
+                const onScreen = new Set();
+                let activeSeq = -1;
+
+                function setActive(i) {
+                    if (i === activeSeq) return;
+                    activeSeq = i;
+                    const s = SEQ[i];
+                    SEQ.forEach(function (o, k) {
+                        if (o.marker) o.marker.classList.toggle('is-active', k === i);
+                    });
+                    navLinks.forEach(function (a) {
+                        a.classList.toggle('is-active', a.hash === '#' + s.id);
+                    });
+                    if (seqLabel) {
+                        seqLabel.textContent = 'SEQ ' + String(i + 1).padStart(2, '0') + ' // ' + s.label;
+                    }
+                }
+
+                const spyIO = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (e) {
+                        const i = SEQ.findIndex(function (s) { return s.el === e.target; });
+                        if (i < 0) return;
+                        if (e.isIntersecting) onScreen.add(i); else onScreen.delete(i);
+                    });
+                    if (onScreen.size) setActive(Math.max.apply(null, Array.from(onScreen)));
+                }, { rootMargin: '-45% 0px -45% 0px' });
+                SEQ.forEach(function (s) { spyIO.observe(s.el); });
+
+                /* 4. marquee só consome frames enquanto está na tela */
+                const marqueeSection = document.getElementById('clientes');
+                if (marqueeSection) {
+                    new IntersectionObserver(function (e) {
+                        marqueeLive = e[0].isIntersecting && !document.hidden;
+                        if (marqueeLive) kick();
+                    }, { rootMargin: '160px' }).observe(marqueeSection);
+                }
+
+                /* ---------- gate de rAF reaproveitável (usado pelos cenários 3D) --- */
+                const gates = [];
+                state.rafGate = function (el, render) {
+                    const gate = { visible: false, io: false, id: 0 };
+
+                    function loop() {
+                        gate.id = requestAnimationFrame(loop);
+                        render();
+                    }
+
+                    gate.sync = function () {
+                        const want = gate.io && !document.hidden;
+                        if (want === gate.visible) return;
+                        gate.visible = want;
+                        if (!want) {
+                            cancelAnimationFrame(gate.id);
+                            gate.id = 0;
+                            return;
+                        }
+                        if (reduce) { render(); return; }   /* pinta um frame e para */
+                        gate.id = requestAnimationFrame(loop);
+                    };
+
+                    new IntersectionObserver(function (e) {
+                        gate.io = e[0].isIntersecting;
+                        gate.sync();
+                    }, { rootMargin: '160px' }).observe(el);
+
+                    gates.push(gate);
+                    return gate;
+                };
+
+                document.addEventListener('visibilitychange', function () {
+                    gates.forEach(function (g) { g.sync(); });
+                    if (marqueeSection) marqueeLive = marqueeLive && !document.hidden;
+                    if (!document.hidden) kick();
+                });
+
+                /* ---------- reduced motion ao vivo ---------- */
+                rmq.addEventListener('change', function (e) {
+                    reduce = e.matches;
+                    if (reduce) {
+                        ['--sv', '--svs', '--mx'].forEach(function (v) {
+                            root.style.setProperty(v, '0');
+                        });
+                        root.classList.remove('scrub-scrolling');
+                        wasScrolling = false;
+                        mx = 0;
+                    }
+                    gates.forEach(function (g) {
+                        g.visible = false;      /* força reavaliação no próximo sync */
+                        cancelAnimationFrame(g.id);
+                        g.id = 0;
+                        g.sync();
+                    });
+                    kick();
+                });
+
+                /* ---------- bootstrap ---------- */
+                let remeasure = 0;
+                function scheduleMeasure() {
+                    cancelAnimationFrame(remeasure);
+                    remeasure = requestAnimationFrame(function () { measure(); kick(); });
+                }
+                window.addEventListener('resize', scheduleMeasure);
+                if (window.ResizeObserver) {
+                    new ResizeObserver(scheduleMeasure).observe(document.body);
+                }
+                window.addEventListener('load', scheduleMeasure);
+
+                measure();
+                kick();
+            })();
+    </script>
+    <!-- Three.js Scripts -->
+    <script>
+        // ANIMATION 9 - Header
+        (function () {
+            const container = document.getElementById('hero-3d-container');
+            if (!container) return;
+
+            const width = container.clientWidth || window.innerWidth;
+            const height = container.clientHeight || window.innerHeight;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.z = 4;
+
+            let renderer;
+            try {
+                renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            } catch (e) {
+                return;   /* WebGL bloqueado: a página segue sem o objeto 3D */
+            }
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            container.appendChild(renderer.domElement);
+
+            const geometry = new THREE.IcosahedronGeometry(1.5, 1);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x888888,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.5
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+
+            const innerGeom = new THREE.IcosahedronGeometry(0.5, 0);
+            const innerMat = new THREE.MeshPhongMaterial({ color: 0xf5f5f5 });
+            const innerMesh = new THREE.Mesh(innerGeom, innerMat);
+            scene.add(innerMesh);
+
+            const light = new THREE.PointLight(0xffffff, 1, 100);
+            light.position.set(5, 5, 5);
+            scene.add(light);
+
+            const ambientLight = new THREE.AmbientLight(0x202020);
+            scene.add(ambientLight);
+
+            /* mouse define uma inclinação ALVO (-1..1), não velocidade */
+            let mouseX = 0;
+            let mouseY = 0;
+            let tiltX = 0;
+            let tiltY = 0;
+
+            const MAX_TILT = 0.5;   /* inclinação máxima em radianos (~28°) */
+            const EASE = 0.09;      /* quanto do caminho até o alvo por frame */
+
+            window.addEventListener('mousemove', (e) => {
+                mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+                mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+            });
+
+            const scrub = window.__scrub;
+            let spin = 0;
+
+            function render() {
+                const v = scrub ? scrub.vel : 0;
+
+                /* persegue o alvo com amortecimento: para junto com o cursor */
+                tiltX += (mouseY * MAX_TILT - tiltX) * EASE;
+                tiltY += (mouseX * MAX_TILT - tiltY) * EASE;
+
+                spin += 0.002 + v * 0.06;
+
+                mesh.rotation.x = tiltX + spin * 0.4;
+                mesh.rotation.y = tiltY + spin;
+                innerMesh.rotation.x -= 0.005 + v * 0.05;
+                innerMesh.rotation.y -= 0.005;
+                renderer.render(scene, camera);
+            }
+
+            window.addEventListener('resize', () => {
+                const w = container.clientWidth || window.innerWidth;
+                const h = container.clientHeight || window.innerHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+                render();
+            });
+
+            /* gated pelo SCRUB: só renderiza na tela e com a aba visível */
+            if (scrub && scrub.rafGate) {
+                scrub.rafGate(container, render);
+            } else {
+                (function loop() { requestAnimationFrame(loop); render(); })();
+            }
+        })();
+
+        // ANIMATION 10 - Footer
+        (function () {
+            const container = document.getElementById('footer-3d-container');
+            if (!container) return;
+
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.z = 5;
+
+            let renderer;
+            try {
+                renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            } catch (e) {
+                return;   /* WebGL bloqueado: a página segue sem o objeto 3D */
+            }
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            container.appendChild(renderer.domElement);
+
+            const group = new THREE.Group();
+            scene.add(group);
+
+            const coreGeometry = new THREE.SphereGeometry(1.5, 64, 64);
+            const coreMaterial = new THREE.MeshPhongMaterial({
+                color: 0xf5f5f5,
+                specular: 0xffffff,
+                shininess: 100,
+                transparent: true,
+                opacity: 0.9
+            });
+            const core = new THREE.Mesh(coreGeometry, coreMaterial);
+            group.add(core);
+
+            const ringGeom = new THREE.TorusGeometry(2.2, 0.05, 16, 100);
+            const ringMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 1, roughness: 0.2 });
+
+            const ring1 = new THREE.Mesh(ringGeom, ringMat);
+            group.add(ring1);
+
+            const ring2 = new THREE.Mesh(ringGeom, ringMat);
+            ring2.rotation.x = Math.PI / 2;
+            group.add(ring2);
+
+            const ring3 = new THREE.Mesh(ringGeom, ringMat);
+            ring3.rotation.y = Math.PI / 2;
+            group.add(ring3);
+
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(5, 5, 5);
+            scene.add(light);
+
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+            pointLight.position.set(-5, -5, 5);
+            scene.add(pointLight);
+
+            const scrub = window.__scrub;
+
+            function render() {
+                const v = scrub ? scrub.vel : 0;
+                group.rotation.y += 0.005 + v * 0.08;
+                group.rotation.x += 0.003;
+                ring1.rotation.z += 0.01 + v * 0.06;
+                ring2.rotation.z -= 0.015 + v * 0.04;
+                ring3.rotation.z += 0.02;
+                renderer.render(scene, camera);
+            }
+
+            window.addEventListener('resize', () => {
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                if (!w || !h) return;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+                render();
+            });
+
+            if (scrub && scrub.rafGate) {
+                scrub.rafGate(container, render);
+            } else {
+                (function loop() { requestAnimationFrame(loop); render(); })();
+            }
+        })();
+    </script>
+</body>
+
+</html>
