@@ -677,6 +677,13 @@
             }
         }
 
+        /* SMOOTH ligado: o motor passa a escrever a posição a cada frame, então
+           o suavizador nativo tem de sair do caminho — dois amortecedores
+           disputando o mesmo scrollTop brigam e travam no meio. */
+        html.scrub-smooth {
+            scroll-behavior: auto;
+        }
+
         .nav-link.is-active {
             color: #ffffff;
             border-bottom-color: #ffffff;
@@ -1297,6 +1304,113 @@
                     }
                 }
 
+                /* ---------- SMOOTH — inércia sobre o scroll nativo ---------------
+                   Não existe scroll container próprio nem transform no <body>: o
+                   que anda é a posição real da janela, então sticky, o pin da
+                   escultura, os IntersectionObserver e a busca do navegador
+                   continuam valendo. Roda e trackpad alimentam um ALVO; o alvo é
+                   perseguido com amortecimento exponencial dentro do mesmo loop
+                   do motor — nenhum rAF extra.
+
+                   Fica fora do caminho onde o nativo já é melhor: toque (momentum
+                   do sistema), teclado, barra de rolagem e prefers-reduced-motion.
+                   Qualquer scroll que não tenha sido escrito por nós reassume o
+                   alvo no frame seguinte, então os dois modos convivem. */
+                const SMOOTH_EASE = 8;      /* 1/s: constante de tempo do alcance */
+                const SMOOTH_WHEEL = 1;     /* ganho da roda (1 = distância nativa) */
+                const SMOOTH_LINE = 18;     /* px por linha quando deltaMode = 1 */
+                const SMOOTH_SNAP = 0.5;    /* px: abaixo disso encosta e dorme */
+                const SMOOTH_DRIFT = 1.5;   /* px: tolerância antes de resincronizar */
+
+                const smooth = (function () {
+                    const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+                    const api = { on: false, animating: false };
+
+                    let target = window.scrollY;
+                    let pos = target;      /* posição contínua (o browser arredonda) */
+                    let written = -1;      /* último y que ESTE módulo pediu */
+
+                    function clamp(v) {
+                        return Math.max(0, Math.min(scrollRange, v));
+                    }
+
+                    api.refresh = function () {
+                        const want = fine.matches && !reduce;
+                        if (want === api.on) return;
+                        api.on = want;
+                        root.classList.toggle('scrub-smooth', want);
+                        target = pos = window.scrollY;
+                        written = -1;
+                        api.animating = false;
+                    };
+
+                    /* alvo absoluto, usado pelas âncoras */
+                    api.to = function (y) {
+                        if (!api.on) return false;
+                        target = clamp(y);
+                        api.animating = true;
+                        kick();
+                        return true;
+                    };
+
+                    /* um passo do amortecedor; roda antes da leitura de scrollY */
+                    api.step = function (dt) {
+                        if (!api.on || !api.animating) return;
+                        target = clamp(target);
+                        const k = 1 - Math.exp(-SMOOTH_EASE * dt);
+                        pos += (target - pos) * k;
+                        if (Math.abs(target - pos) < SMOOTH_SNAP) {
+                            pos = target;
+                            api.animating = false;
+                        }
+                        written = pos;
+                        window.scrollTo(0, pos);
+                    };
+
+                    /* o browser é a fonte da verdade: se a posição real divergiu do
+                       que pedimos, alguém mais mexeu (toque, teclado, âncora nativa,
+                       restauração de sessão, fim do documento) — o alvo cede. */
+                    api.observe = function (y) {
+                        if (written >= 0 && Math.abs(y - written) <= SMOOTH_DRIFT) return;
+                        target = pos = y;
+                        written = -1;
+                        api.animating = false;
+                    };
+
+                    window.addEventListener('wheel', function (e) {
+                        if (!api.on || e.ctrlKey || e.defaultPrevented) return;
+                        if (scrollRange <= 1) return;
+                        /* respiro para qualquer região que role por conta própria */
+                        if (e.target.closest && e.target.closest('[data-smooth-ignore]')) return;
+                        const unit = e.deltaMode === 1 ? SMOOTH_LINE
+                            : e.deltaMode === 2 ? viewportH : 1;
+                        e.preventDefault();
+                        target = clamp(target + e.deltaY * unit * SMOOTH_WHEEL);
+                        api.animating = true;
+                        kick();
+                    }, { passive: false });
+
+                    /* âncoras: com scroll-behavior desligado o salto seria seco, então
+                       o próprio amortecedor leva até lá, respeitando o header fixo. */
+                    document.addEventListener('click', function (e) {
+                        if (!api.on || e.defaultPrevented || e.button !== 0) return;
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                        const a = e.target.closest && e.target.closest('a[href^="#"]');
+                        if (!a) return;
+                        const hash = a.getAttribute('href');
+                        if (!hash || hash === '#') return;
+                        const el = document.getElementById(hash.slice(1));
+                        if (!el) return;
+                        e.preventDefault();
+                        api.to(el.getBoundingClientRect().top + window.scrollY - (headerH + 24));
+                        if (history.pushState) history.pushState(null, '', hash);
+                    });
+
+                    fine.addEventListener('change', api.refresh);
+                    api.refresh();
+                    return api;
+                })();
+
                 /* ---------- loop único, com auto-idle ---------- */
                 let lastY = window.scrollY;
                 let lastT = 0;
@@ -1311,7 +1425,10 @@
                     const dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
                     lastT = t;
 
+                    smooth.step(dt);          /* escreve a posição ANTES de ler */
+
                     const y = window.scrollY;
+                    smooth.observe(y);        /* toque/teclado/âncora reassumem o alvo */
                     const dy = y - lastY;
                     lastY = y;
 
@@ -1353,7 +1470,7 @@
 
                 function tick(t) {
                     frame(t);
-                    const busy = dirty || Math.abs(vel) > 0.001 || (marqueeLive && !reduce);
+                    const busy = dirty || smooth.animating || Math.abs(vel) > 0.001 || (marqueeLive && !reduce);
                     dirty = false;
                     if (busy) {
                         requestAnimationFrame(tick);
@@ -1478,6 +1595,7 @@
                 /* ---------- reduced motion ao vivo ---------- */
                 rmq.addEventListener('change', function (e) {
                     reduce = e.matches;
+                    smooth.refresh();           /* reduce desliga a inércia */
                     if (reduce) {
                         ['--sv', '--svs', '--mx'].forEach(function (v) {
                             root.style.setProperty(v, '0');
