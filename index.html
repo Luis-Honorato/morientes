@@ -114,8 +114,17 @@
             initial-value: 0;
         }
 
+        @property --vp {
+            /* progresso do vídeo esculpido . 0 → 1 */
+            syntax: '<number>';
+            inherits: true;
+            initial-value: 0;
+        }
+
         :root {
             --accent: #196EFA;
+            /* quanto scroll a seção de serviços fica presa até o vídeo terminar */
+            --pin-scroll: 200vh;
         }
 
         html {
@@ -483,6 +492,163 @@
             }
         }
 
+        /* ---------- núcleo esculpido: o vídeo como playhead do card ----------
+           O travamento é `position: sticky` de verdade — o scroll segue nativo,
+           sem hijack. O motor escreve --vp (0 → 1) e sincroniza o currentTime;
+           daqui para baixo é só CSS.
+
+           ATENÇÃO: a media query do pin tem de ser IDÊNTICA ao matchMedia do
+           motor. Se divergirem, o intervalo medido não bate com o que está
+           preso e o vídeo termina antes (ou depois) de a seção soltar. */
+        .scrub-pin {
+            /* estado base = sem pin (mobile / reduced-motion): bloco normal */
+            padding-top: 120px;
+            padding-bottom: 48px;
+        }
+
+        @media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+            .scrub-pin-track {
+                height: calc(100vh + var(--pin-scroll));
+            }
+
+            .scrub-pin {
+                position: sticky;
+                top: 0;
+                /* 100vh exatos: a distância presa é então --pin-scroll, o mesmo
+                   intervalo que o motor mapeia para os frames do vídeo. */
+                height: 100vh;
+                padding-top: var(--header-h, 96px);
+                padding-bottom: 24px;
+            }
+        }
+
+        /* O poster cobre a área até o primeiro quadro ser desenhado. */
+        .scrub-carve-media {
+            background: #0b0b0b url('poster_estatua.jpg') center / cover no-repeat;
+        }
+
+        /* Canvas em vez de <video>: `currentTime` é sempre um seek assíncrono pelo
+           decoder (~40ms), o que limita a ~25 atualizações/s e com jitter. Numa
+           seção travada o vídeo é o único movimento na tela, então esse jitter lê
+           como engasgo. Desenhar um quadro já decodificado é síncrono e acompanha
+           o rAF a 60Hz. */
+        .scrub-carve-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity .3s linear;
+            pointer-events: none;
+        }
+
+        .scrub-carve.is-ready .scrub-carve-canvas {
+            opacity: 1;
+        }
+
+        /* O badge fica POR CIMA de pixels que mudam a cada quadro. Um
+           backdrop-filter aqui obriga o compositor a refazer o blur a cada
+           desenho — o mesmo custo que foi tirado do painel. Fundo opaco resolve. */
+        .scrub-carve-media .scrub-meta {
+            backdrop-filter: none;
+            background: rgba(5, 5, 5, .82);
+        }
+
+        /* Painel opaco de propósito: `backdrop-filter` sobre um subtree que muda
+           a cada seek obriga o compositor a refazer o blur em todo frame — é o
+           caminho mais caro possível para um vídeo. Sobre o fundo achatado da
+           página, #111 é indistinguível do rgba(20,20,20,.7) do .glass-panel. */
+        .scrub-carve {
+            background: #111111;
+            backdrop-filter: none;
+        }
+
+        @media (min-width: 768px) {
+            .scrub-carve-media {
+                min-height: min(58vh, 560px);
+            }
+
+            /* A lateral esquerda dissolve no painel. Antes isso era mask-image,
+               que tira o vídeo do caminho rápido de composição (e no Safari o
+               joga para o software). Um gradiente pintado por cima dá o mesmo
+               resultado sobre um fundo achatado, sem custo de máscara. */
+            .scrub-carve-media::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: 2;
+                pointer-events: none;
+                background: linear-gradient(to right,
+                        #111111 0%,
+                        rgba(17, 17, 17, .92) 10%,
+                        rgba(17, 17, 17, .55) 20%,
+                        rgba(17, 17, 17, 0) 34%);
+            }
+        }
+
+        @media (max-width: 767px) {
+            /* recorte mais alto que o 16:9 da fonte: o busto é centralizado e as
+               laterais são vazias, então cortar as bordas o aproxima da tela. */
+            .scrub-carve-media {
+                aspect-ratio: 4 / 3;
+            }
+
+            /* sem hover no toque, o badge ficaria permanentemente sobre a cabeça */
+            .scrub-carve-media .scrub-meta {
+                display: none;
+            }
+        }
+
+        /* espinha à esquerda do card: borda estática até o scrub estar de fato
+           vivo (sem JS, sem vídeo ou com reduced-motion ela permanece borda). */
+        .scrub-carve-spine {
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 4;
+            width: 4px;
+            height: 100%;
+            background: #ffffff;
+            pointer-events: none;
+        }
+
+        /* com o scrub vivo a borda vira trilha, e o playhead a preenche */
+        .carve-live .scrub-carve-spine {
+            background: rgba(255, 255, 255, .14);
+        }
+
+        .carve-live .scrub-carve-spine::after {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: calc(var(--vp) * 100%);
+            background: linear-gradient(180deg, #ffffff, var(--accent));
+            box-shadow: 0 0 12px rgba(25, 110, 250, .5);
+        }
+
+        .scrub-carve-bar {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 4;
+            height: 2px;
+            opacity: 0;
+            transform: scaleX(var(--vp));
+            transform-origin: 0 50%;
+            background: linear-gradient(90deg, rgba(25, 110, 250, .3), var(--accent));
+            pointer-events: none;
+        }
+
+        .scrub-carve-tc {
+            opacity: 0;
+            transition: opacity .3s linear;
+        }
+
+        .carve-live .scrub-carve-bar,
+        .carve-live .scrub-carve-tc {
+            opacity: 1;
+        }
+
         /* parallax nativo dirigido por scroll, onde houver suporte */
         @keyframes scrubParallax {
             from {
@@ -664,48 +830,70 @@
             </div>
         </section>
         <!-- Services Section -->
-        <section class="scrub-cut py-section-gap px-margin-mobile md:px-margin-desktop relative" id="servicos">
-            <div class="max-w-7xl mx-auto">
-                <div class="mb-16">
-                    <h2
-                        class="scrub-reveal font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight">
-                        POSICIONAMENTO DIGITAL</h2>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
-                    <!-- Main Service -->
-                    <div
-                        class="scrub-reveal md:col-span-12 glass-panel p-8 md:p-12 rounded-lg border-l-4 border-l-primary group hover:bg-surface-container-low transition-colors duration-300">
-                        <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">01 //
-                            NÚCLEO</span>
-                        <h3
-                            class="font-display-2xl text-headline-lg md:text-display-2xl text-primary tracking-tighter mb-4 group-hover:titanium-gradient transition-all">
-                            ESTRATÉGIA DE POSICIONAMENTO</h3>
-                        <p class="font-body-md text-on-surface-variant max-w-2xl">Mapeamento de ecossistema, definição
-                            de arquétipos e criação de diretrizes fundamentais para estabelecer autoridade
-                            inquestionável no mercado digital.</p>
+        <section class="scrub-cut relative" id="servicos">
+            <!-- Núcleo: o palco fica preso enquanto o scroll esculpe o vídeo -->
+            <div class="scrub-pin-track relative">
+                <div class="scrub-pin flex flex-col justify-center px-margin-mobile md:px-margin-desktop">
+                    <div class="max-w-7xl w-full mx-auto">
+                        <div class="mb-8 md:mb-12">
+                            <h2
+                                class="scrub-reveal font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight">
+                                POSICIONAMENTO DIGITAL</h2>
+                        </div>
+                        <!-- Main Service: card e vídeo são um só painel -->
+                        <div
+                            class="scrub-carve scrub-reveal glass-panel rounded-lg overflow-clip relative grid grid-cols-1 md:grid-cols-12 group hover:bg-surface-container-low transition-colors duration-300">
+                            <span aria-hidden="true" class="scrub-carve-spine"></span>
+                            <div class="md:col-span-5 p-8 md:p-12 flex flex-col justify-center relative z-10">
+                                <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">01
+                                    // NÚCLEO</span>
+                                <h3
+                                    class="font-display-2xl text-headline-lg-mobile md:text-display-2xl text-primary tracking-tighter mb-4 group-hover:titanium-gradient transition-all">
+                                    ESTRATÉGIA DE POSICIONAMENTO</h3>
+                                <p class="font-body-md text-on-surface-variant">Mapeamento de ecossistema, definição
+                                    de arquétipos e criação de diretrizes fundamentais para estabelecer autoridade
+                                    inquestionável no mercado digital.</p>
+                                <p
+                                    class="scrub-carve-tc font-technical-sm text-technical-sm text-outline tabular-nums mt-8">
+                                    FRM <span data-carve-frame>000</span>/<span data-carve-total>000</span> // DO BLOCO
+                                    BRUTO À FORMA
+                                </p>
+                            </div>
+                            <div class="scrub-carve-media md:col-span-7 relative">
+                                <canvas aria-hidden="true" class="scrub-carve-canvas" id="carve-canvas"></canvas>
+                                <div class="scrub-meta scrub-type font-technical-sm text-technical-sm" style="--d:.3s">
+                                    <span>960×542</span><span>24 FPS</span><span>SCT_ESTÁTUA</span>
+                                </div>
+                                <span aria-hidden="true" class="scrub-carve-bar"></span>
+                            </div>
+                        </div>
                     </div>
-                    <!-- Secondary Services -->
+                </div>
+            </div>
+            <!-- Secondary Services: fora do pin, em fluxo normal -->
+            <div class="px-margin-mobile md:px-margin-desktop pt-section-gap pb-section-gap">
+                <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-gutter">
                     <div style="--d:.08s"
-                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg mt-8 border-t border-border-subtle hover:border-titanium transition-colors duration-300">
+                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg border-t border-border-subtle hover:border-titanium transition-colors duration-300">
                         <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">02</span>
-                        <h4 class="font-headline-lg-mobile text-primary tracking-tight mb-4">Identidade Visual de Alta
-                            Fidelidade</h4>
+                        <h4 class="font-headline-lg-mobile text-xl text-primary tracking-tight mb-4">Identidade Visual
+                            de Alta Fidelidade</h4>
                         <p class="font-body-md text-on-surface-variant text-sm">Design systems escaláveis, tipografia
                             proprietária e direção de arte focada em luxo tecnológico.</p>
                     </div>
                     <div style="--d:.12s"
-                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg mt-8 border-t border-border-subtle hover:border-titanium transition-colors duration-300">
+                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg border-t border-border-subtle hover:border-titanium transition-colors duration-300">
                         <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">03</span>
-                        <h4 class="font-headline-lg-mobile text-primary tracking-tight mb-4">Narrativa Cinematográfica
-                        </h4>
+                        <h4 class="font-headline-lg-mobile text-xl text-primary tracking-tight mb-4">Narrativa
+                            Cinematográfica</h4>
                         <p class="font-body-md text-on-surface-variant text-sm">Produção audiovisual de ponta, motion
                             design e storytelling visual para campanhas de impacto.</p>
                     </div>
                     <div style="--d:.16s"
-                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg mt-8 border-t border-border-subtle hover:border-titanium transition-colors duration-300">
+                        class="scrub-reveal md:col-span-4 glass-panel p-8 rounded-lg border-t border-border-subtle hover:border-titanium transition-colors duration-300">
                         <span class="scrub-type font-technical-sm text-technical-sm text-outline mb-4 block">04</span>
-                        <h4 class="font-headline-lg-mobile text-primary tracking-tight mb-4">Gestão de Ativos Digitais
-                        </h4>
+                        <h4 class="font-headline-lg-mobile text-xl text-primary tracking-tight mb-4">Gestão de Ativos
+                            Digitais</h4>
                         <p class="font-body-md text-on-surface-variant text-sm">Organização, manutenção e evolução
                             contínua da presença digital da marca em múltiplos pontos de contato.</p>
                     </div>
@@ -859,6 +1047,10 @@
                 const VEL_SMOOTH = 0.18;
                 const MARQUEE_SCRUB = 0.35;      /* quanto o scroll empurra o ticker */
                 const MARQUEE_LOOP = 20;         /* segundos por volta em repouso */
+                const CARVE_FRAMES = 107;        /* quadros em frames/ (4,45s a 24 fps) */
+                const CARVE_MOBILE_STEP = 3;     /* mobile carrega 1 de cada 3 quadros */
+                const CARVE_IN = 0.85;           /* sem pin: onde o scrub começa (fração da viewport) */
+                const CARVE_OUT = 0.15;          /* sem pin: onde o scrub termina */
 
                 const state = { vel: 0, progress: 0 };
                 window.__scrub = state;
@@ -901,6 +1093,164 @@
                 const mTrack = document.querySelector('.marquee-content');
                 const header = document.querySelector('header');
 
+                /* ---------- núcleo esculpido: sequência scrubbada pelo scroll ------
+                   O bloco de pedra vira busto conforme o playhead anda. No desktop
+                   a seção fica presa (sticky) e o intervalo preso é mapeado 1:1 nos
+                   quadros; abaixo de 768px não há pin — o scrub acontece enquanto o
+                   painel atravessa a tela. Nada de listener próprio: entra no mesmo
+                   loop do motor, com a geometria cacheada em measure(). */
+                const carve = (function () {
+                    const panel = document.querySelector('.scrub-carve');
+                    const track = document.querySelector('.scrub-pin-track');
+                    const media = document.querySelector('.scrub-carve-media');
+                    const canvas = document.getElementById('carve-canvas');
+                    if (!panel || !track || !media || !canvas) return null;
+
+                    const ctx = canvas.getContext('2d', { alpha: false });
+                    if (!ctx) return null;
+
+                    const frameEl = panel.querySelector('[data-carve-frame]');
+                    const totalEl = panel.querySelector('[data-carve-total]');
+                    const pinMQ = window.matchMedia('(min-width: 768px) and (prefers-reduced-motion: no-preference)');
+
+                    /* O passo é decidido uma vez, no load: no mobile 1 de cada 3
+                       quadros basta e o download cai a um terço. Redimensionar para
+                       desktop depois mantém a sequência curta — mais grosseira, mas
+                       correta; não vale rebaixar a página para rebuscar quadros. */
+                    const step = window.matchMedia('(min-width: 768px)').matches ? 1 : CARVE_MOBILE_STEP;
+                    const imgs = [];
+                    for (let n = 1; n <= CARVE_FRAMES; n += step) {
+                        imgs.push({ n: n, el: null });
+                    }
+                    const lastIndex = imgs.length - 1;
+
+                    const api = { io: false, live: false, ready: false };
+                    let start = 0;
+                    let range = 1;
+                    let lastDrawn = -1;
+                    let loaded = 0;
+
+                    if (totalEl) totalEl.textContent = String(lastIndex).padStart(3, '0');
+
+                    /* ---- carga: assíncrona, sem bloquear nada ---- */
+                    imgs.forEach(function (slot, i) {
+                        const el = new Image();
+                        el.decoding = 'async';
+                        /* o início da sequência chega primeiro; o resto pinga em
+                           prioridade baixa para não disputar com fontes e CSS. */
+                        el.fetchPriority = i < 12 ? 'high' : 'low';
+                        el.src = 'frames/estatua_' + String(slot.n).padStart(3, '0') + '.jpg';
+                        el.onload = function () {
+                            slot.el = el;
+                            loaded++;
+                            if (!api.ready) {
+                                api.ready = true;
+                                api.sync();
+                                /* pinta já: o canvas é opaco, então revelá-lo em
+                                   branco mostraria um retângulo preto por cima do
+                                   poster até o scroll chegar na faixa do scrub. */
+                                sizeCanvas();
+                                draw(0);
+                                lastDrawn = 0;
+                                panel.classList.add('is-ready');
+                                scheduleMeasure();
+                                return;
+                            }
+                            /* quadro que faltava no lugar do alvo atual: redesenha */
+                            if (i === lastDrawn) { lastDrawn = -1; kick(); }
+                        };
+                        el.onerror = function () { loaded++; };
+                    });
+
+                    /* Enquanto a sequência carrega, usa o quadro carregado mais
+                       próximo em vez de deixar buraco. */
+                    function pick(i) {
+                        if (imgs[i].el) return imgs[i].el;
+                        for (let d = 1; d <= lastIndex; d++) {
+                            if (i - d >= 0 && imgs[i - d].el) return imgs[i - d].el;
+                            if (i + d <= lastIndex && imgs[i + d].el) return imgs[i + d].el;
+                        }
+                        return null;
+                    }
+
+                    /* cover: preenche a área e centraliza o corte, como object-fit */
+                    function draw(i) {
+                        const img = pick(i);
+                        if (!img) return;
+                        const cw = canvas.width;
+                        const ch = canvas.height;
+                        const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+                        const w = img.naturalWidth * s;
+                        const h = img.naturalHeight * s;
+                        ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
+                    }
+
+                    /* O backing store acompanha o tamanho real e o DPR (limitado a 2:
+                       acima disso o ganho é invisível e o custo de fill é real). */
+                    function sizeCanvas() {
+                        const r = media.getBoundingClientRect();
+                        const dpr = Math.min(2, window.devicePixelRatio || 1);
+                        const w = Math.max(1, Math.round(r.width * dpr));
+                        const h = Math.max(1, Math.round(r.height * dpr));
+                        if (w === canvas.width && h === canvas.height) return;
+                        canvas.width = w;
+                        canvas.height = h;
+                        lastDrawn = -1;      /* backing store novo vem em branco */
+                    }
+
+                    api.measure = function () {
+                        const y = window.scrollY;
+                        sizeCanvas();
+                        if (pinMQ.matches) {
+                            /* o filho grudado tem 100vh exatos, então o trecho preso
+                               é a altura do track menos uma viewport. */
+                            start = track.getBoundingClientRect().top + y;
+                            range = Math.max(1, track.offsetHeight - viewportH);
+                        } else {
+                            const r = panel.getBoundingClientRect();
+                            start = r.top + y - viewportH * CARVE_IN;
+                            range = Math.max(1, r.height + viewportH * (CARVE_IN - CARVE_OUT));
+                        }
+                        if (api.ready && lastDrawn < 0) api.update(y);
+                    };
+
+                    api.update = function (y) {
+                        if (!api.ready || !api.live || reduce) return;
+                        const vp = Math.min(1, Math.max(0, (y - start) / range));
+                        root.style.setProperty('--vp', vp.toFixed(4));
+
+                        const i = Math.round(vp * lastIndex);
+                        if (i === lastDrawn) return;
+                        lastDrawn = i;
+                        draw(i);
+                        if (frameEl) frameEl.textContent = String(i).padStart(3, '0');
+                    };
+
+                    api.sync = function () {
+                        const on = api.ready && !reduce;
+                        root.classList.toggle('carve-live', on);
+                        lastDrawn = -1;
+                        if (!on) root.style.setProperty('--vp', '0');
+                    };
+
+                    new IntersectionObserver(function (e) {
+                        api.io = e[0].isIntersecting;
+                        api.live = api.io && !document.hidden;
+                        if (!api.live) return;
+                        lastDrawn = -1;
+                        kick();
+                    }, { rootMargin: '200px' }).observe(track);
+
+                    /* atravessar 768px troca o modo: o CSS muda a altura do track,
+                       então a geometria precisa ser remedida depois do layout. */
+                    pinMQ.addEventListener('change', function () {
+                        lastDrawn = -1;
+                        scheduleMeasure();
+                    });
+
+                    return api;
+                })();
+
                 function measure() {
                     viewportH = window.innerHeight;
                     scrollRange = Math.max(1, root.scrollHeight - viewportH);
@@ -925,6 +1275,8 @@
                         const p = Math.min(1, Math.max(0, top / scrollRange));
                         s.marker.style.top = (p * 100).toFixed(3) + '%';
                     });
+
+                    if (carve) carve.measure();
                 }
 
                 /* ---------- timecode SMPTE ---------- */
@@ -968,6 +1320,7 @@
                     root.style.setProperty('--sp', p.toFixed(5));
                     root.style.setProperty('--hp', Math.min(1, y / Math.max(1, viewportH)).toFixed(4));
                     updateTimecode(p);
+                    if (carve) carve.update(y);
 
                     if (reduce) {
                         vel = 0;
@@ -1118,6 +1471,7 @@
                 document.addEventListener('visibilitychange', function () {
                     gates.forEach(function (g) { g.sync(); });
                     if (marqueeSection) marqueeLive = marqueeLive && !document.hidden;
+                    if (carve) carve.live = carve.io && !document.hidden;
                     if (!document.hidden) kick();
                 });
 
@@ -1138,6 +1492,10 @@
                         g.id = 0;
                         g.sync();
                     });
+                    if (carve) {
+                        carve.sync();           /* liga/desliga o scrub do vídeo */
+                        scheduleMeasure();      /* o pin sai/entra: remedir o trecho */
+                    }
                     kick();
                 });
 
